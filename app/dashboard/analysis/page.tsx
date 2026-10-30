@@ -1,7 +1,9 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useRef, useState } from "react";
-import { defaultInput, fetchModel, saveApplications, type ApplicationRecord, type Prediction } from "@/lib/model";
+import Link from "next/link";
+import { useAuth } from "@/components/AuthProvider";
+import { createManualReview, defaultInput, fetchModel, saveApplications, type ApplicationRecord, type Prediction } from "@/lib/model";
 
 const featureLabels: Record<string, string> = {
   Age: "Age",
@@ -65,11 +67,17 @@ function parseCsv(text: string): Record<string, unknown>[] {
 }
 
 export default function AnalysisPage() {
+  const { user } = useAuth();
   const [inputs, setInputs] = useState(defaultInput);
   const [name, setName] = useState("");
   const [prediction, setPrediction] = useState<Prediction | null>(null);
+  const [applicationRecord, setApplicationRecord] = useState<ApplicationRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [bulkResults, setBulkResults] = useState<ApplicationRecord[]>([]);
   const [bulkProgress, setBulkProgress] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -79,7 +87,7 @@ export default function AnalysisPage() {
 
   async function submitApplication(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(""); setPrediction(null); setBusy(true);
+    setError(""); setReviewMessage(""); setReviewError(""); setReviewSubmitted(false); setPrediction(null); setApplicationRecord(null); setBusy(true);
     try {
       const result = await fetchModel<Prediction>("predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(inputs) });
       setPrediction(result);
@@ -91,13 +99,31 @@ export default function AnalysisPage() {
         Gender: `Group ${inputs.Gender}`,
         Education: education,
       };
-      saveApplications([{
+      const record: ApplicationRecord = {
         id: crypto.randomUUID(), createdAt: new Date().toISOString(), name: name.trim() || "Applicant",
         approval: result.approval_chances_percentage, prediction: result.prediction_class, inputs, profile,
-      }]);
+      };
+      saveApplications([record]);
+      setApplicationRecord(record);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to analyze this application.");
     } finally { setBusy(false); }
+  }
+
+  async function requestManualReview() {
+    if (!user || !applicationRecord) return;
+    setReviewMessage(""); setReviewError(""); setReviewBusy(true);
+    try {
+      const submitted = await createManualReview(applicationRecord, user.id);
+      setReviewSubmitted(true);
+      setReviewMessage(submitted
+        ? "This application was sent to the review team. You can follow the decision in Application history."
+        : "This application is already in the review queue. Follow its status in Application history.");
+    } catch (requestError) {
+      setReviewError(requestError instanceof Error ? requestError.message : "Could not submit this application for manual review.");
+    } finally {
+      setReviewBusy(false);
+    }
   }
 
   async function submitCsv(event: ChangeEvent<HTMLInputElement>) {
@@ -211,6 +237,17 @@ export default function AnalysisPage() {
             <p className="factor-note">Positive and negative values show direction of contribution to the model score.</p>
           </article>}
         </div>
+        <div className="manual-review-action">
+          <div>
+            <strong>Want a person to review this application?</strong>
+            <p>{user ? "A reviewer can assess the application and return a separate decision to your history." : "Sign in before requesting review so you can track the decision in your account history."}</p>
+          </div>
+          {user ? <button className="button button-secondary" type="button" onClick={requestManualReview} disabled={reviewBusy || reviewSubmitted}>
+            {reviewBusy ? "Sending for review…" : reviewSubmitted ? "Sent for manual review" : "Request manual review"}
+          </button> : <Link className="button button-secondary" href="/login">Sign in to request review</Link>}
+        </div>
+        {reviewMessage && <p className="manual-review-message" role="status">{reviewMessage}</p>}
+        {reviewError && <p className="manual-review-message manual-review-error" role="alert">{reviewError}</p>}
       </section>}
 
       <section className="panel bulk-panel">

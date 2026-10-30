@@ -23,7 +23,13 @@ The backend uses Groq to explain each model prediction and suggest general loan 
 
 Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local` using the public project URL and anon/publishable key from Supabase. Sign-up and password sign-in use Supabase Auth. Do not put a Supabase service-role key in the frontend.
 
-Application history is currently stored in the user's browser local storage. Supabase Auth does not sync history to a database.
+Application history is stored in the user's browser. Applications explicitly sent for manual review are also stored in Supabase; the reviewer decision and notes are synced back into the signed-in user's history.
+
+### Manual application reviews
+
+Run `../supabase/migrations/20261031000000_manual_reviews.sql` in the Supabase SQL Editor to create the review table and row-level security policies. Applicants must be signed in to send an analysis for review. Reviewers use `/dashboard/manual-reviews`; access is enforced by Supabase RLS and requires the signed-in user's `app_metadata` to contain `"role": "admin"`. Set this claim for trusted reviewer accounts in Supabase Auth (do not use editable `user_metadata`), then have the reviewer sign out and back in to refresh the JWT. Never expose a service-role key in the frontend.
+
+Applicants can read only their own review records; only admins can list all submissions and update review outcomes. Model estimates remain separate from reviewer outcomes in the applicant's history.
 
 ## CSV bulk analysis
 

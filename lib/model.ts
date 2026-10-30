@@ -1,3 +1,5 @@
+import { getSupabaseClient } from "@/lib/supabase";
+
 export type Prediction = {
   approval_chances_percentage: number;
   prediction_class: string;
@@ -47,6 +49,24 @@ export type ApplicationRecord = {
   prediction: string;
   inputs: Record<string, number>;
   profile: Record<string, string>;
+  manualReviewStatus?: "pending" | "completed";
+  manualReviewResult?: "approved" | "declined" | "more_info" | null;
+  manualReviewNotes?: string | null;
+};
+
+export type ManualReviewRecord = {
+  id: string;
+  application_id: string;
+  user_id: string;
+  applicant_name: string;
+  applicant_inputs: Record<string, number>;
+  model_approval: number;
+  model_prediction: string;
+  status: "pending" | "completed";
+  review_result: "approved" | "declined" | "more_info" | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export const HISTORY_KEY = "lendwise-applications";
@@ -112,6 +132,74 @@ export function saveApplications(records: ApplicationRecord[]) {
     console.error("Could not save application history.", error);
     throw new Error("Predictions completed, but application history could not be saved in this browser.");
   }
+}
+
+export async function createManualReview(record: ApplicationRecord, userId: string) {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("manual_reviews")
+    .select("id")
+    .eq("application_id", record.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (lookupError) throw new Error(`Could not check the manual review status: ${lookupError.message}`);
+  if (existing) return false;
+
+  const { data, error } = await supabase.from("manual_reviews").insert({
+    application_id: record.id,
+    user_id: userId,
+    applicant_name: record.name,
+    applicant_inputs: record.inputs,
+    model_approval: record.approval,
+    model_prediction: record.prediction,
+  }).select("id").single();
+
+  if (error) throw new Error(`Could not submit this application for manual review: ${error.message}`);
+  return Boolean(data);
+}
+
+export async function fetchManualReviews(userId: string) {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase
+    .from("manual_reviews")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Could not load manual review results: ${error.message}`);
+  return data as ManualReviewRecord[];
+}
+
+export async function fetchAllManualReviews() {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase
+    .from("manual_reviews")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Could not load the review queue: ${error.message}`);
+  return data as ManualReviewRecord[];
+}
+
+export async function completeManualReview(id: string, result: NonNullable<ManualReviewRecord["review_result"]>, notes: string) {
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase.from("manual_reviews").update({
+    status: "completed",
+    review_result: result,
+    review_notes: notes.trim() || null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", id).select("id").single();
+
+  if (error) throw new Error(`Could not save the manual review: ${error.message}`);
 }
 
 export function metricPercent(value: number | undefined) {

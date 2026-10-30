@@ -19,6 +19,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, configured } = useAuth();
+  const isAdmin = user?.app_metadata.role === "admin";
   const [serviceStatus, setServiceStatus] = useState<"checking" | "connected" | "unavailable">("checking");
   const [signingOut, setSigningOut] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -62,13 +63,13 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </Link>
         <div className="workspace-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Main navigation">
-          {navigation.map((item) => {
+          {[...navigation, ...(isAdmin ? [{ href: "/dashboard/manual-reviews", label: "Manual reviews", icon: "✓" }] : [])].map((item) => {
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
             return (
               <Link className={`nav-link${active ? " active" : ""}`} href={item.href} key={item.href}>
                 <span className="nav-icon">{item.icon}</span>
                 {item.label}
-                {item.label === "Application history" && <span className="nav-count">Local</span>}
+                {item.label === "Application history" && <span className="nav-count">Mine</span>}
               </Link>
             );
           })}
