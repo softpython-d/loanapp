@@ -58,8 +58,8 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar">
         <Link className="brand" href="/dashboard">
-          <span className="brand-mark">l</span>
-          <span>lendwise<span className="brand-dot">.</span></span>
+          <span className="brand-mark">J</span>
+          <span>Justifi<span className="brand-dot">.</span></span>
         </Link>
         <div className="workspace-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Main navigation">

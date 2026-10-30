@@ -1,4 +1,4 @@
-# Lendwise frontend
+# Justifi frontend
 
 Next.js dashboard for the loan model in `../backend`, with a server-side proxy to the deployed Render API.
 

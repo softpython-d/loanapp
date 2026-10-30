@@ -3,7 +3,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Lendwise — Loan intelligence",
+  title: "Justifi — Loan intelligence",
   description: "Clear, responsible insights for loan applications and model performance.",
 };
 
